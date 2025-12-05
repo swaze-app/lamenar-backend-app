@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from database import get_db
+from core import get_db
 from models import User
 from schemas import SignupRequest, UserResponse, LoginRequest, LoginResponse, Token
-from auth import get_password_hash, verify_password, create_access_token, get_current_active_user
+from utils.auth import get_password_hash, verify_password, create_access_token, get_current_active_user
+from utils.company_extraction import extract_company_from_email, normalize_company_domain
 from datetime import timedelta
 from config import settings
 
@@ -12,7 +13,7 @@ router = APIRouter(prefix="/api/auth", tags=["authentication"])
 
 @router.post("/signup", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 def signup(user_data: SignupRequest, db: Session = Depends(get_db)):
-    """Create a new user account with work email validation"""
+    """Create a new user account with work email validation and company extraction"""
     # Email validation is handled by Pydantic validator, but double-check here
     email_lower = user_data.email.lower()
     domain = email_lower.split('@')[-1] if '@' in email_lower else ''
@@ -44,13 +45,25 @@ def signup(user_data: SignupRequest, db: Session = Depends(get_db)):
                 detail="Please provide either referrer name or email when you were referred by someone"
             )
     
-    # Create new user
+    # Extract company information from email domain
+    company_info = extract_company_from_email(email_lower)
+    company_domain = normalize_company_domain(company_info["domain"])
+    company_display_name = company_info["display_name"]
+    
+    # Check if company with this domain already exists (for statistics)
+    existing_company_users = db.query(User).filter(
+        User.company_domain == company_domain
+    ).count()
+    
+    # Create new user with company extracted from email
     hashed_password = get_password_hash(user_data.password)
     new_user = User(
         email=email_lower,
         password=hashed_password,
         name=user_data.name,
-        company=user_data.company,
+        company_domain=company_domain,  # e.g., "acmecorp.com"
+        company_display_name=company_display_name,  # e.g., "Acmecorp"
+        company=company_display_name,  # Legacy field for backward compatibility
         department=user_data.department,
         role=user_data.role,
         was_referred=user_data.was_referred,

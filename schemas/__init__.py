@@ -29,13 +29,22 @@ def validate_work_email(email: str) -> str:
 class UserBase(BaseModel):
     email: EmailStr
     name: str = Field(..., min_length=1)
-    company: str = Field(..., min_length=1, description="Company name is required")
+    # Company fields - auto-extracted from email domain
+    company_domain: str = Field(..., description="Company domain extracted from email")
+    company_display_name: str = Field(..., description="User-friendly company display name")
+    # Legacy field for backward compatibility
+    company: Optional[str] = None  # Deprecated - use company_display_name
     department: Optional[str] = None
     role: str = Field(..., min_length=1, description="Role is required")
 
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
+    """User creation schema - company is auto-extracted from email"""
+    email: EmailStr
     password: str = Field(..., min_length=8, description="Password must be at least 8 characters")
+    name: str = Field(..., min_length=1)
+    department: Optional[str] = None
+    role: str = Field(..., min_length=1, description="Role is required")
     was_referred: Literal["yes", "no"] = Field(..., description="Were you referred by someone?")
     referrer_name: Optional[str] = None
     referrer_email: Optional[EmailStr] = None
@@ -57,8 +66,16 @@ class UserCreate(UserBase):
         return self
 
 
-class UserResponse(UserBase):
+class UserResponse(BaseModel):
+    """User response schema with company information"""
     id: str
+    email: EmailStr
+    name: str
+    company_domain: str
+    company_display_name: str
+    company: Optional[str] = None  # Legacy field
+    department: Optional[str] = None
+    role: str
     created_at: datetime
     updated_at: datetime
 

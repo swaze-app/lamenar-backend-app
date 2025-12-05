@@ -1,6 +1,6 @@
 from sqlalchemy import Column, String, DateTime, Integer
 from sqlalchemy.sql import func
-from database import Base
+from core import Base
 import uuid
 
 
@@ -15,7 +15,11 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     password = Column(String, nullable=False)  # Hashed password
     name = Column(String, nullable=False)
-    company = Column(String, nullable=False)  # Required field
+    # Company fields - extracted from email domain
+    company_domain = Column(String, nullable=False, index=True)  # e.g., "acmecorp.com" - used for matching
+    company_display_name = Column(String, nullable=False)  # e.g., "Acmecorp" - user-friendly name
+    # Legacy field for backward compatibility (can be removed later)
+    company = Column(String, nullable=True)  # Deprecated - use company_display_name
     department = Column(String, nullable=True)
     role = Column(String, nullable=False)  # Required field
     was_referred = Column(String, nullable=False)  # "yes" or "no"
